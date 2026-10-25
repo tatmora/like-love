@@ -1,39 +1,173 @@
 
-const countEl = document.getElementById('count');
-const pauseBtn = document.getElementById('pause');
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Likes Me</title>
+  <style>
+    * { box-sizing: border-box; }
 
-const likesKey = 'likes-me-total';
-let likes = Number(localStorage.getItem(likesKey) || 0);
-let paused = false;
-let lastTick = Date.now();
-
-function paint() {
-  countEl.textContent = likes.toLocaleString('es-UY');
-  localStorage.setItem(likesKey, String(likes));
-}
-
-// Mostrar el total guardado al entrar
-paint();
-
-// Sumar 1 like por segundo
-setInterval(() => {
-  if (!paused) {
-    const now = Date.now();
-    const seconds = Math.floor((now - lastTick) / 1000);
-
-    if (seconds >= 1) {
-      likes += seconds;
-      lastTick += seconds * 1000;
-      paint();
+    body {
+      margin: 0;
+      background: #000;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
     }
-  } else {
-    lastTick = Date.now();
-  }
-}, 200);
 
-// Pausar y continuar
-pauseBtn.addEventListener('click', () => {
-  paused = !paused;
-  pauseBtn.textContent = paused ? 'Continuar' : 'Pausar';
-  lastTick = Date.now();
-});
+    .camera {
+      position: relative;
+      width: 100%;
+      height: 65vh;
+      background: #000;
+      overflow: hidden;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+
+    #placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 18px;
+      padding: 20px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 30px;
+      padding: 14px 22px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: bold;
+    }
+
+    .start {
+      background: #ff426d;
+      color: white;
+    }
+
+    #count {
+      font-size: clamp(60px, 12vw, 90px);
+      font-weight: 900;
+      margin: 15px 0;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      padding: 10px 20px 25px;
+    }
+
+    .controls button {
+      background: transparent;
+      color: white;
+      border: 1px solid #555;
+    }
+
+    #status {
+      color: #aaa;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="camera">
+    <video id="video" autoplay muted playsinline
+      style="display:none"></video>
+
+    <div id="placeholder">
+      <div style="font-size:48px;color:#ff426d">♥</div>
+      <p>Activá la cámara para verte en pantalla.</p>
+      <button class="start" id="startCamera">
+        Activar cámara
+      </button>
+    </div>
+  </div>
+
+  <div id="count">0</div>
+  <div>LIKES</div>
+
+  <div class="controls">
+    <button id="pause">Pausar</button>
+    <button id="reset">Reiniciar</button>
+  </div>
+
+  <p id="status">Sumando likes automáticamente.</p>
+
+  <script>
+    const video = document.getElementById("video");
+    const placeholder = document.getElementById("placeholder");
+    const countEl = document.getElementById("count");
+    const pauseBtn = document.getElementById("pause");
+    const status = document.getElementById("status");
+
+    let likes = 0;
+    let paused = false;
+
+    // Activar la cámara frontal del celular
+    document.getElementById("startCamera")
+      .addEventListener("click", async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user" },
+            audio: false
+          });
+
+          video.srcObject = stream;
+          await video.play();
+          video.style.display = "block";
+          placeholder.style.display = "none";
+
+          status.textContent =
+            "Tu cámara está activa. Los likes siguen sumando.";
+        } catch (error) {
+          status.textContent =
+            "No se pudo activar la cámara. Revisá los permisos.";
+        }
+      });
+
+    // Sumar un like por segundo
+    setInterval(() => {
+      if (!paused) {
+        likes++;
+        countEl.textContent = likes.toLocaleString("es-UY");
+      }
+    }, 1000);
+
+    // Pausar y continuar
+    pauseBtn.addEventListener("click", () => {
+      paused = !paused;
+      pauseBtn.textContent = paused ? "Continuar" : "Pausar";
+      status.textContent = paused
+        ? "Contador pausado."
+        : "Sumando likes automáticamente.";
+    });
+
+    // Reiniciar contador
+    document.getElementById("reset").addEventListener("click", () => {
+      likes = 0;
+      countEl.textContent = "0";
+    });
+
+    // Apagar la cámara al salir de la página
+    window.addEventListener("pagehide", () => {
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+      }
+    });
+  </script>
+
+</body>
+</html>

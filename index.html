@@ -78,7 +78,7 @@ button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 }
 
 .count {
-  font-size: clamp(36px, 6vw, 56px);
+  font-size: clamp(25px, 4.2vw, 39px);
   font-weight: 900;
   letter-spacing: -.08em;
   line-height: 1;
@@ -148,36 +148,50 @@ function paint() {
   safeSet(LIKES_KEY, String(likes));
 }
 
-/* Sonido: un "pop" suave generado con Web Audio (no necesita archivos).
-   El AudioContext se crea al tocar el botón, así el navegador permite el audio. */
-let audioCtx = null;
+/* Sonido: un "pop" generado en código como un WAV y reproducido con <audio>.
+   Se usa <audio> (y no Web Audio) porque suena aunque el iPhone esté en silencio
+   y no queda bloqueado al activar la cámara. */
+let popAudio = null;
+
+function makePopWav() {
+  const sr = 22050;
+  const n = Math.floor(sr * 0.35);
+  const buf = new ArrayBuffer(44 + n * 2);
+  const v = new DataView(buf);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+
+  str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE');
+  str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, n * 2, true);
+
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const freq = 660 + 440 * Math.min(1, t / 0.09);
+    phase += (2 * Math.PI * freq) / sr;
+    const env = t < 0.01 ? t / 0.01 : Math.exp(-(t - 0.01) * 12);
+    v.setInt16(44 + i * 2, Math.sin(phase) * env * 0.9 * 32767, true);
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+}
 
 function initAudio() {
   try {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
-    audioCtx = audioCtx || new AC();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-  } catch { audioCtx = null; }
+    if (!popAudio) {
+      popAudio = new Audio(URL.createObjectURL(makePopWav()));
+      popAudio.preload = 'auto';
+    }
+    popAudio.volume = 1;
+    /* Se reproduce una vez dentro del toque del usuario para desbloquear el audio */
+    popAudio.play().catch(() => {});
+  } catch { popAudio = null; }
 }
 
 function playLike() {
-  if (!audioCtx) return;
-  const t = audioCtx.currentTime;
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(660, t);
-  osc.frequency.exponentialRampToValueAtTime(1100, t + 0.09);
-
-  gain.gain.setValueAtTime(0.0001, t);
-  gain.gain.exponentialRampToValueAtTime(0.14, t + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
-
-  osc.connect(gain).connect(audioCtx.destination);
-  osc.start(t);
-  osc.stop(t + 0.3);
+  if (!popAudio) return;
+  popAudio.currentTime = 0;
+  popAudio.play().catch(() => {});
 }
 
 /* +1 cada 2 segundos, desde el momento en que se activa la cámara.

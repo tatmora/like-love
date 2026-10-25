@@ -78,7 +78,7 @@ button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 }
 
 .count {
-  font-size: clamp(58px, 9vw, 88px);
+  font-size: clamp(36px, 6vw, 56px);
   font-weight: 900;
   letter-spacing: -.08em;
   line-height: 1;
@@ -148,12 +148,45 @@ function paint() {
   safeSet(LIKES_KEY, String(likes));
 }
 
-/* +1 por segundo, desde el momento en que se activa la cámara.
+/* Sonido: un "pop" suave generado con Web Audio (no necesita archivos).
+   El AudioContext se crea al tocar el botón, así el navegador permite el audio. */
+let audioCtx = null;
+
+function initAudio() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    audioCtx = audioCtx || new AC();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch { audioCtx = null; }
+}
+
+function playLike() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(660, t);
+  osc.frequency.exponentialRampToValueAtTime(1100, t + 0.09);
+
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.14, t + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + 0.3);
+}
+
+/* +1 cada 2 segundos, desde el momento en que se activa la cámara.
    No suma si la pestaña está oculta. */
 function tick() {
   if (document.hidden) return;
   likes += 1;
   paint();
+  playLike();
 }
 
 function stopCamera() {
@@ -165,6 +198,7 @@ function stopCamera() {
 
 startBtn.addEventListener('click', async () => {
   startBtn.disabled = true;
+  initAudio();
 
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -185,7 +219,7 @@ startBtn.addEventListener('click', async () => {
 
     paint();
     clearInterval(timer);
-    timer = setInterval(tick, 1000);
+    timer = setInterval(tick, 2000);
   } catch (error) {
     stopCamera();
     startBtn.textContent = 'Reintentar';

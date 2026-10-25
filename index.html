@@ -168,12 +168,14 @@ function makePopWav() {
   let phase = 0;
   for (let i = 0; i < n; i++) {
     const t = i / sr;
-    const freq = 330 - 110 * Math.min(1, t / 0.12);
+    const freq = 170 - 100 * Math.min(1, t / 0.07);
     phase += (2 * Math.PI * freq) / sr;
-    const env = t < 0.01 ? t / 0.01 : Math.exp(-(t - 0.01) * 10);
-    /* Un armónico suave agrega cuerpo para que se escuche bien en parlantes de celular */
-    const wave = Math.sin(phase) + 0.35 * Math.sin(phase * 2);
-    v.setInt16(44 + i * 2, wave * env * 0.7 * 32767, true);
+    const env = t < 0.004 ? t / 0.004 : Math.exp(-(t - 0.004) * 16);
+    /* Golpe grave + armónicos (para que se oiga en parlantes de celular)
+       + un "toc" breve al inicio que le da la sensación de golpe */
+    const body = Math.sin(phase) + 0.5 * Math.sin(phase * 2) + 0.25 * Math.sin(phase * 3);
+    const knock = (Math.random() * 2 - 1) * Math.exp(-t * 350) * 0.35;
+    v.setInt16(44 + i * 2, (body * env + knock) * 0.6 * 32767, true);
   }
   return new Blob([buf], { type: 'audio/wav' });
 }

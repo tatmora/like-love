@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mirame</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #000;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+
+    main {
+      width: 100%;
+      max-width: 560px;
+      margin: auto;
+    }
+
+    .camera {
+      height: 65svh;
+      min-height: 300px;
+      position: relative;
+      background: #000;
+      overflow: hidden;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+
+    #start {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 14px 22px;
+      background: #ff426d;
+      color: white;
+      border: none;
+      border-radius: 30px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    #likes {
+      font-size: clamp(60px, 15vw, 90px);
+      font-weight: bold;
+      margin: 20px 0;
+    }
+
+    #heart {
+      color: #ff426d;
+      font-size: 30px;
+    }
+
+    #message {
+      color: #aaa;
+      font-size: 13px;
+      padding: 0 15px;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <div class="camera">
+      <video id="video" autoplay muted playsinline hidden></video>
+      <button id="start">Activar cámara</button>
+    </div>
+
+    <div id="likes">0</div>
+    <div id="heart">♥</div>
+    <p id="message"></p>
+  </main>
+
+  <script>
+    const video = document.getElementById("video");
+    const startButton = document.getElementById("start");
+    const likesDisplay = document.getElementById("likes");
+    const message = document.getElementById("message");
+
+    let likes = 0;
+    let detector = null;
+    let running = false;
+    let lastLike = 0;
+
+    startButton.addEventListener("click", async () => {
+      try {
+        if (!("FaceDetector" in window)) {
+          message.textContent =
+            "Este navegador no admite la detección automática de rostros. Probá con otro navegador compatible.";
+          return;
+        }
+
+        startButton.disabled = true;
+        message.textContent = "Activando cámara...";
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: false
+        });
+
+        video.srcObject = stream;
+        video.hidden = false;
+        await video.play();
+
+        startButton.hidden = true;
+
+        detector = new FaceDetector({
+          fastMode: true,
+          maxDetectedFaces: 1
+        });
+
+        running = true;
+        lastLike = performance.now();
+        message.textContent = "Mirá hacia la cámara";
+
+        detectFace();
+      } catch (error) {
+        message.textContent =
+          "No se pudo activar la cámara. Revisá los permisos.";
+        startButton.disabled = false;
+      }
+    });
+
+    async function detectFace() {
+      if (!running) return;
+
+      try {
+        const faces = await detector.detect(video);
+        const now = performance.now();
+
+        if (faces.length > 0 && now - lastLike >= 1000) {
+          likes++;
+          likesDisplay.textContent = likes;
+          lastLike = now;
+        }
+      } catch (error) {
+        message.textContent = "No se pudo analizar la imagen.";
+      }
+
+      if (running) {
+        setTimeout(detectFace, 200);
+      }
+    }
+
+    window.addEventListener("pagehide", () => {
+      running = false;
+
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+      }
+    });
+  </script>
+</body>
+</html>

@@ -155,7 +155,7 @@ let popAudio = null;
 
 function makePopWav() {
   const sr = 22050;
-  const n = Math.floor(sr * 0.35);
+  const n = Math.floor(sr * 0.08);
   const buf = new ArrayBuffer(44 + n * 2);
   const v = new DataView(buf);
   const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
@@ -165,17 +165,16 @@ function makePopWav() {
   v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
   str(36, 'data'); v.setUint32(40, n * 2, true);
 
-  let phase = 0;
+  /* Chasquido seco: ruido filtrado que se apaga muy rápido
+     + un toque tonal breve para que tenga cuerpo */
+  let lp = 0;
   for (let i = 0; i < n; i++) {
     const t = i / sr;
-    const freq = 170 - 100 * Math.min(1, t / 0.07);
-    phase += (2 * Math.PI * freq) / sr;
-    const env = t < 0.004 ? t / 0.004 : Math.exp(-(t - 0.004) * 16);
-    /* Golpe grave + armónicos (para que se oiga en parlantes de celular)
-       + un "toc" breve al inicio que le da la sensación de golpe */
-    const body = Math.sin(phase) + 0.5 * Math.sin(phase * 2) + 0.25 * Math.sin(phase * 3);
-    const knock = (Math.random() * 2 - 1) * Math.exp(-t * 350) * 0.35;
-    v.setInt16(44 + i * 2, (body * env + knock) * 0.6 * 32767, true);
+    lp += 0.45 * ((Math.random() * 2 - 1) - lp);
+    const click = lp * Math.exp(-t * 220);
+    const tone = Math.sin(2 * Math.PI * 1100 * t) * Math.exp(-t * 160) * 0.5;
+    const sample = Math.max(-1, Math.min(1, (click * 1.2 + tone) * 0.8));
+    v.setInt16(44 + i * 2, sample * 32767, true);
   }
   return new Blob([buf], { type: 'audio/wav' });
 }
